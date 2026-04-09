@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CMU-Africa Deadline Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+          --bg:#f0f3fa;--card:#ffffff;--border:#e4e8f0;
+          --text-primary:#0f172a;--text-secondary:#64748b;--text-muted:#94a3b8;
+          --input-bg:#f8f9fc;--tab-inactive-bg:#ffffff;--tab-inactive-color:#64748b;
+          --tab-inactive-border:#e4e8f0;--section-divider:#e4e8f0;
+          --delete-btn-color:#cbd5e1;--theme-btn-bg:#ffffff;
+          --theme-btn-border:#e4e8f0;--theme-btn-color:#f59e0b;
+          --day-item-color:#475569;--day-item-border:#c7d5f7;
+        }
+        [data-theme="dark"] {
+          --bg:#0d1117;--card:#161b22;--border:#30363d;
+          --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+          --input-bg:#0d1117;--tab-inactive-bg:#161b22;--tab-inactive-color:#8b949e;
+          --tab-inactive-border:#30363d;--section-divider:#30363d;
+          --delete-btn-color:#484f58;--theme-btn-bg:#161b22;
+          --theme-btn-border:#30363d;--theme-btn-color:#a5b4fc;
+          --day-item-color:#8b949e;--day-item-border:#3b65e8;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text-primary);transition:background .3s,color .3s;min-height:100vh;padding:1.2rem 1rem 3rem;}
+        #theme-toggle{position:fixed;top:16px;right:16px;z-index:999;width:42px;height:42px;border-radius:50%;background:var(--theme-btn-bg);border:1.5px solid var(--theme-btn-border);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.1);transition:all .2s;}
+        #theme-toggle:hover{transform:scale(1.1)}
+        #theme-icon{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+        .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;transition:background .3s,border-color .3s}
+        .task-row{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:12px 14px;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px}
+        .task-row.exam-row{border-left:3px solid #6690f5}
+        .task-row.done{opacity:.42}
+        .check-circle{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+        .check-circle.checked{background:#3b65e8;border-color:#3b65e8}
+        .check-circle.checked::after{content:'';display:block;width:6px;height:10px;border:2px solid white;border-top:none;border-left:none;transform:rotate(45deg) translate(-1px,-1px)}
+        .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+        .badge-urgent{background:#fee2e2;color:#b91c1c}
+        .badge-warn{background:#fef3c7;color:#92400e}
+        .badge-ok{background:#d1fae5;color:#065f46}
+        .badge-tbd{background:#e0e7ff;color:#3730a3}
+        .badge-done{background:#f1f5f9;color:#94a3b8}
+        [data-theme="dark"] .badge-urgent{background:#3b1212;color:#fca5a5}
+        [data-theme="dark"] .badge-warn{background:#2d2006;color:#fcd34d}
+        [data-theme="dark"] .badge-ok{background:#052e16;color:#6ee7b7}
+        [data-theme="dark"] .badge-tbd{background:#1e1b4b;color:#a5b4fc}
+        [data-theme="dark"] .badge-done{background:#1e2433;color:#6e7681}
+        .day-block{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;transition:background .3s,border-color .3s}
+        .day-item{font-size:13px;color:var(--day-item-color);padding:5px 0 5px 12px;border-left:2px solid var(--day-item-border)}
+        .day-item+.day-item{margin-top:4px}
+        .section-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px}
+        input[type="text"],input[type="datetime-local"]{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s}
+        input:focus{border-color:#6690f5;box-shadow:0 0 0 3px rgba(102,144,245,.15)}
+        [data-theme="dark"] input{color-scheme:dark}
+        .add-btn{height:38px;padding:0 16px;background:#3b65e8;border:none;border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .15s}
+        .add-btn:hover{background:#2d52c9}
+        .tab-btn{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+    </style>
+</head>
+<body>
+
+<button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+    <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+         stroke="var(--theme-btn-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+</button>
+
+<div style="max-width:640px;margin:0 auto">
+    <div style="margin-bottom:20px;padding-right:50px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <div style="width:34px;height:34px;background:#3b65e8;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+            </div>
+            <h1 style="font-size:19px;font-weight:600;color:var(--text-primary)">CMU-Africa deadline tracker</h1>
+        </div>
+        <p id="today-label" style="font-size:12px;color:var(--text-secondary);margin-left:44px"></p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
+        <div class="stat-card"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">Remaining</div><div id="stat-remaining" style="font-size:24px;font-weight:600;color:var(--text-primary);font-family:'DM Mono',monospace">—</div></div>
+        <div class="stat-card"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">Completed</div><div id="stat-done" style="font-size:24px;font-weight:600;color:var(--text-primary);font-family:'DM Mono',monospace">—</div></div>
+        <div class="stat-card"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px">Due this week</div><div id="stat-week" style="font-size:24px;font-weight:600;color:#3b65e8;font-family:'DM Mono',monospace">—</div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px">
+        <button class="tab-btn active" id="tab-btn-assignments" onclick="switchTab('assignments',this)" style="border:1px solid #3b65e8;background:#3b65e8;color:white">Assignments</button>
+        <button class="tab-btn" id="tab-btn-exams" onclick="switchTab('exams',this)" style="border:1px solid var(--tab-inactive-border);background:var(--tab-inactive-bg);color:var(--tab-inactive-color)">Exams</button>
+        <button class="tab-btn" id="tab-btn-schedule" onclick="switchTab('schedule',this)" style="border:1px solid var(--tab-inactive-border);background:var(--tab-inactive-bg);color:var(--tab-inactive-color)">Schedule</button>
+    </div>
+
+    <div id="tab-assignments"></div>
+    <div id="tab-exams" style="display:none"></div>
+    <div id="tab-schedule" style="display:none"></div>
+</div>
+
+<script>
+    const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+    const isAndroid = typeof Android !== 'undefined';
+
+    // Default tasks only used if DB is empty (first launch)
+    const DEFAULT_TASKS = [
+      {id:1,name:"HW 5",course:"INFOSEC",due:"2026-04-15T23:59",type:"assignment",done:false},
+      {id:2,name:"Final proposal",course:"INFOSEC",due:"2026-04-22T05:59",type:"assignment",done:false},
+      {id:3,name:"Lab 3",course:"AIOPS",due:"2026-04-23T23:51",type:"assignment",done:false},
+      {id:4,name:"HW 4",course:"ICT BIZ",due:"2026-04-17T23:59",type:"assignment",done:false},
+      {id:5,name:"Assignment",course:"ICT BIZ",due:null,type:"assignment",done:false},
+      {id:6,name:"Final proposal",course:"IDS",due:"2026-05-11T16:00",type:"assignment",done:false},
+      {id:7,name:"ICT BIZ exam",course:"ICT BIZ",due:"2026-04-27T10:00",type:"exam",room:"F305",end:"11:30",done:false},
+      {id:8,name:"INFOSEC exam",course:"INFOSEC",due:"2026-04-28T10:00",type:"exam",room:"F203",end:"11:30",done:false},
+    ];
+
+    let tasks = [];
+    let nextId = 100;
+
+    // Called by Android after page load with saved tasks
+    function loadTasksFromAndroid(savedTasks) {
+      if (savedTasks && savedTasks.length > 0) {
+        tasks = savedTasks.map(t => ({
+          ...t,
+          due: t.due ? t.due : null
+        }));
+        nextId = Math.max(...tasks.map(t => t.id)) + 1;
+      } else {
+        // First launch — seed defaults and save them
+        tasks = DEFAULT_TASKS;
+        nextId = 9;
+        if (isAndroid) tasks.forEach(t => Android.saveTask(JSON.stringify(serializeTask(t))));
+      }
+      render();
+    }
+
+    // If not on Android (browser preview), load defaults
+    if (!isAndroid) { tasks = DEFAULT_TASKS; nextId = 9; render(); }
+
+    function serializeTask(t) {
+      const out = {id:t.id, name:t.name, course:t.course, due:t.due||null, type:t.type, done:!!t.done};
+      if (t.room) out.room = t.room;
+      if (t.end)  out.end  = t.end;
+      return out;
+    }
+
+    const SUN  = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+    const MOON = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const dark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', dark ? 'light' : 'dark');
+      document.getElementById('theme-icon').innerHTML = dark ? SUN : MOON;
+      refreshTabStyles();
+    }
+
+    function refreshTabStyles() {
+      document.querySelectorAll('.tab-btn:not(.active)').forEach(b => {
+        b.style.background = 'var(--tab-inactive-bg)';
+        b.style.color = 'var(--tab-inactive-color)';
+        b.style.borderColor = 'var(--tab-inactive-border)';
+      });
+    }
+
+    function daysLeft(due) {
+      if (!due) return null;
+      const d = new Date(due); d.setHours(0,0,0,0);
+      return Math.ceil((d - TODAY) / 864e5);
+    }
+
+    function badgeFor(d, done) {
+      if (done)      return {cls:"badge-done",   label:"Done"};
+      if (d===null)  return {cls:"badge-tbd",    label:"TBD"};
+      if (d < 0)     return {cls:"badge-urgent", label:"Overdue"};
+      if (d === 0)   return {cls:"badge-urgent", label:"Due today"};
+      if (d <= 3)    return {cls:"badge-urgent", label:`${d}d left`};
+      if (d <= 7)    return {cls:"badge-warn",   label:`${d}d left`};
+      return              {cls:"badge-ok",    label:`${d}d left`};
+    }
+
+    function formatDue(due) {
+      if (!due) return "Date TBD";
+      const d = new Date(due);
+      return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' · ' +
+             d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    }
+
+    function toggleDone(id) {
+      tasks = tasks.map(t => t.id === id ? {...t, done: !t.done} : t);
+      const t = tasks.find(t => t.id === id);
+      if (isAndroid) Android.updateTask(JSON.stringify(serializeTask(t)));
+      render();
+    }
+
+    function deleteTask(id) {
+      if (!confirm('Remove this task?')) return;
+      tasks = tasks.filter(t => t.id !== id);
+      if (isAndroid) Android.deleteTask(id);
+      render();
+    }
+
+    function switchTab(name, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'var(--tab-inactive-bg)';
+        b.style.color = 'var(--tab-inactive-color)';
+        b.style.borderColor = 'var(--tab-inactive-border)';
+      });
+      btn.classList.add('active');
+      btn.style.background = '#3b65e8'; btn.style.color = 'white'; btn.style.borderColor = '#3b65e8';
+      ['assignments','exams','schedule'].forEach(t => {
+        document.getElementById('tab-'+t).style.display = t === name ? 'block' : 'none';
+      });
+    }
+
+    function renderTaskList(container, items) {
+      const sorted = [...items].sort((a,b) => {
+        if (!a.due && !b.due) return 0;
+        if (!a.due) return 1; if (!b.due) return -1;
+        return new Date(a.due) - new Date(b.due);
+      });
+
+      let html = sorted.map(t => {
+        const d = daysLeft(t.due), b = badgeFor(d, t.done);
+        const timeStr = t.room && t.due
+          ? ` · ${new Date(t.due).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}–${t.end} · Room ${t.room}`
+          : '';
+        return `<div class="task-row${t.done?' done':''}${t.type==='exam'?' exam-row':''}">
+          <div class="check-circle${t.done?' checked':''}" onclick="toggleDone(${t.id})"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;color:var(--text-primary);${t.done?'text-decoration:line-through;opacity:.5':''}">${t.name}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${t.course}${timeStr} · ${formatDue(t.due)}</div>
+          </div>
+          <span class="badge ${b.cls}">${b.label}</span>
+          <button onclick="deleteTask(${t.id})" style="width:24px;height:24px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:var(--delete-btn-color);font-size:18px;display:flex;align-items:center;justify-content:center;padding:0"
+            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">×</button>
+        </div>`;
+      }).join('');
+
+      const isExam = items.some(t => t.type === 'exam');
+      const cid = isExam ? 'exams' : 'assignments';
+      html += `<div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--section-divider)">
+        <div class="section-label">Add ${isExam?'exam':'assignment'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Name</div><input type="text" id="add-name-${cid}" placeholder="Name"></div>
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course</div><input type="text" id="add-course-${cid}" placeholder="e.g. IDS"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Due date & time</div><input type="datetime-local" id="add-date-${cid}"></div>
+          <button class="add-btn" onclick="addTask('${cid}',${isExam})">+ Add</button>
+        </div>
+      </div>`;
+
+      container.innerHTML = sorted.length === 0
+        ? `<div style="color:var(--text-muted);font-size:13px;padding:10px 0">Nothing here yet.</div>` + html.slice(html.indexOf('<div style="margin-top'))
+        : html;
+    }
+
+    function addTask(cid, isExam) {
+      const name   = document.getElementById('add-name-'+cid).value.trim();
+      const course = document.getElementById('add-course-'+cid).value.trim();
+      const dateVal = document.getElementById('add-date-'+cid).value;
+      if (!name || !course) { alert('Please fill in name and course.'); return; }
+      const newTask = {id: nextId++, name, course, due: dateVal || null, type: isExam ? 'exam' : 'assignment', done: false};
+      tasks.push(newTask);
+      if (isAndroid) Android.saveTask(JSON.stringify(serializeTask(newTask)));
+      document.getElementById('add-name-'+cid).value = '';
+      document.getElementById('add-course-'+cid).value = '';
+      document.getElementById('add-date-'+cid).value = '';
+      render();
+    }
+
+    function buildSchedule() {
+      const upcoming = tasks.filter(t => !t.done && t.due).sort((a,b) => new Date(a.due)-new Date(b.due));
+      const days = [];
+      for (let i = 0; i < 14; i++) {
+        const date = new Date(TODAY); date.setDate(date.getDate()+i);
+        const label = i===0?'Today':i===1?'Tomorrow':date.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+        const dueToday = upcoming.filter(t => { const d=new Date(t.due); d.setHours(0,0,0,0); return d.getTime()===date.getTime(); });
+        const workOn   = upcoming.filter(t => { const dl=daysLeft(t.due); return dl!==null&&dl>0&&dl<=(5-i); });
+        const items=[]; const seen=new Set();
+        dueToday.forEach(t => { if(!seen.has(t.id)){seen.add(t.id);items.push({t,reason:'DUE TODAY',urgent:true});} });
+        workOn.forEach(t =>   { if(!seen.has(t.id)){seen.add(t.id);items.push({t,reason:`due in ${daysLeft(t.due)}d`,urgent:false});} });
+        if (items.length) days.push({label,items});
+      }
+      return days;
+    }
+
+    function render() {
+      renderTaskList(document.getElementById('tab-assignments'), tasks.filter(t => t.type==='assignment'));
+      renderTaskList(document.getElementById('tab-exams'),       tasks.filter(t => t.type==='exam'));
+      document.getElementById('stat-remaining').textContent = tasks.filter(t=>!t.done).length;
+      document.getElementById('stat-done').textContent      = tasks.filter(t=>t.done).length;
+      document.getElementById('stat-week').textContent      = tasks.filter(t=>!t.done&&t.due&&daysLeft(t.due)>=0&&daysLeft(t.due)<=7).length;
+      document.getElementById('today-label').textContent = 'Today is ' +
+        TODAY.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+      const sched = buildSchedule();
+      const el = document.getElementById('tab-schedule');
+      if (!sched.length) { el.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:10px 0">No upcoming deadlines — you\'re all set!</div>'; return; }
+      el.innerHTML = `<div class="section-label">Suggested schedule</div>` +
+        sched.map(day => `<div class="day-block">
+          <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:8px">${day.label}</div>
+          ${day.items.map(({t,reason,urgent}) => `<div class="day-item">
+            <span style="font-weight:500;color:var(--text-primary)">${t.name}</span>
+            <span style="color:var(--text-muted)"> · ${t.course}</span>
+            <span style="margin-left:8px;font-size:11px;font-weight:600;color:${urgent?'#f87171':'#6690f5'}">${reason.toUpperCase()}</span>
+          </div>`).join('')}
+        </div>`).join('');
+    }
+</script>
+</body>
+</html>
