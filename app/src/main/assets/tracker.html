@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>CMU-Africa Deadline Tracker</title>
+    <script>try{const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -30,8 +31,10 @@
         #theme-toggle:hover{transform:scale(1.1)}
         #theme-icon{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
         .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;transition:background .3s,border-color .3s}
-        .task-row{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:12px 14px;display:flex;align-items:center;gap:12px;transition:all .15s;margin-bottom:8px}
+        .task-row{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:12px 14px;display:flex;align-items:center;gap:10px;transition:all .15s;margin-bottom:8px}
         .task-row.exam-row{border-left:3px solid #6690f5}
+        .task-row.overdue-row{border-left:3px solid #ef4444;background:#fff8f8}
+        [data-theme="dark"] .task-row.overdue-row{background:#1c0a0a}
         .task-row.done{opacity:.42}
         .check-circle{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
         .check-circle.checked{background:#3b65e8;border-color:#3b65e8}
@@ -51,15 +54,59 @@
         .day-item{font-size:13px;color:var(--day-item-color);padding:5px 0 5px 12px;border-left:2px solid var(--day-item-border)}
         .day-item+.day-item{margin-top:4px}
         .section-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px}
-        input[type="text"],input[type="datetime-local"]{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s}
+        .group-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding:0 2px}
+        input[type="text"],input[type="datetime-local"],input[type="time"]{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s}
         input:focus{border-color:#6690f5;box-shadow:0 0 0 3px rgba(102,144,245,.15)}
-        [data-theme="dark"] input{color-scheme:dark}
+        select{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s;color-scheme:light}
+        select:focus{border-color:#6690f5;box-shadow:0 0 0 3px rgba(102,144,245,.15)}
+        [data-theme="dark"] input,[data-theme="dark"] select{color-scheme:dark}
         .add-btn{height:38px;padding:0 16px;background:#3b65e8;border:none;border-radius:8px;color:white;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .15s}
         .add-btn:hover{background:#2d52c9}
         .tab-btn{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+        .icon-btn{width:28px;height:28px;border-radius:6px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:color .15s}
+        #edit-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px}
+        #edit-modal.open{display:flex}
+        .modal-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:420px}
     </style>
 </head>
 <body>
+
+<!-- Edit modal -->
+<div id="edit-modal">
+  <div class="modal-card">
+    <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:16px">Edit task</div>
+    <div style="display:grid;gap:10px">
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Name</div>
+        <input type="text" id="edit-name" placeholder="Task name">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course</div>
+        <select id="edit-course"></select>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Due date &amp; time</div>
+        <input type="datetime-local" id="edit-due">
+      </div>
+      <div id="edit-exam-fields" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Room</div>
+            <input type="text" id="edit-room" placeholder="e.g. F305">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">End time</div>
+            <input type="text" id="edit-end" placeholder="e.g. 11:30">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button onclick="closeEditModal()" style="flex:1;height:38px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-secondary);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer">Cancel</button>
+      <button onclick="saveEdit()" class="add-btn" style="flex:2">Save changes</button>
+    </div>
+  </div>
+</div>
 
 <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
     <svg id="theme-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -110,7 +157,6 @@
     const TODAY = new Date(); TODAY.setHours(0,0,0,0);
     const isAndroid = typeof Android !== 'undefined';
 
-    // Default tasks only used if DB is empty (first launch)
     const DEFAULT_TASKS = [
       {id:1,name:"HW 5",course:"INFOSEC",due:"2026-04-15T23:59",type:"assignment",done:false},
       {id:2,name:"Final proposal",course:"INFOSEC",due:"2026-04-22T05:59",type:"assignment",done:false},
@@ -125,16 +171,38 @@
     let tasks = [];
     let nextId = 100;
 
-    // ── Courses ──────────────────────────────────────────────────────────────
+    // ── Theme ─────────────────────────────────────────────────────────────────
+    const SUN  = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+    const MOON = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+
+    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+      document.getElementById('theme-icon').innerHTML = MOON;
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const dark = html.getAttribute('data-theme') === 'dark';
+      const next = dark ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('theme', next); } catch(e) {}
+      document.getElementById('theme-icon').innerHTML = dark ? SUN : MOON;
+      refreshTabStyles();
+    }
+
+    function refreshTabStyles() {
+      document.querySelectorAll('.tab-btn:not(.active)').forEach(b => {
+        b.style.background = 'var(--tab-inactive-bg)';
+        b.style.color = 'var(--tab-inactive-color)';
+        b.style.borderColor = 'var(--tab-inactive-border)';
+      });
+    }
+
+    // ── Courses ───────────────────────────────────────────────────────────────
     const COURSES_KEY = 'deadline_tracker_courses';
 
     function loadCourses() {
-      try {
-        const raw = localStorage.getItem(COURSES_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch(e) { return null; }
+      try { const r = localStorage.getItem(COURSES_KEY); return r ? JSON.parse(r) : null; } catch(e) { return null; }
     }
-
     function saveCourses() {
       try { localStorage.setItem(COURSES_KEY, JSON.stringify(courses)); } catch(e) {}
     }
@@ -150,25 +218,35 @@
       courses.sort();
       saveCourses();
       input.value = '';
-      renderCourses();
-      render(); // refresh dropdowns in other tabs
+      render();
     }
 
     function deleteCourse(name) {
+      const inUse = tasks.filter(t => t.course === name);
+      if (inUse.length > 0) {
+        alert(`Cannot delete "${name}" — ${inUse.length} task${inUse.length > 1 ? 's' : ''} still use it.\nDelete or reassign those tasks first.`);
+        return;
+      }
       courses = courses.filter(c => c !== name);
       saveCourses();
-      renderCourses();
       render();
     }
 
     function renderCourses() {
       const el = document.getElementById('tab-courses');
-      const rows = courses.map(c => `
-        <div class="task-row" style="padding:10px 14px">
-          <div style="flex:1;font-size:14px;font-weight:500;color:var(--text-primary)">${c}</div>
-          <button onclick="deleteCourse('${c}')" style="width:24px;height:24px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:var(--delete-btn-color);font-size:18px;display:flex;align-items:center;justify-content:center;padding:0"
-            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">×</button>
-        </div>`).join('');
+      const rows = courses.map(c => {
+        const count = tasks.filter(t => t.course === c).length;
+        return `<div class="task-row" style="padding:10px 14px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;color:var(--text-primary)">${c}</div>
+            ${count > 0 ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${count} task${count > 1 ? 's' : ''}</div>` : ''}
+          </div>
+          <button onclick="deleteCourse('${c}')" class="icon-btn" style="color:var(--delete-btn-color)" title="Delete course"
+            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`;
+      }).join('');
 
       el.innerHTML = `
         ${courses.length === 0
@@ -183,6 +261,12 @@
             </div>
             <button class="add-btn" onclick="addCourse()">+ Add</button>
           </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--section-divider)">
+          <button onclick="exportData()" style="width:100%;height:38px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-secondary);font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s"
+            onmouseover="this.style.background='var(--input-bg)'" onmouseout="this.style.background='transparent'">
+            Export backup (JSON)
+          </button>
         </div>`;
     }
 
@@ -190,19 +274,85 @@
       if (courses.length === 0)
         return `<input type="text" id="add-course-${cid}" placeholder="Add courses first">`;
       const opts = courses.map(c => `<option value="${c}">${c}</option>`).join('');
-      return `<select id="add-course-${cid}" style="width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s">${opts}</select>`;
+      return `<select id="add-course-${cid}">${opts}</select>`;
     }
 
+    function exportData() {
+      const data = JSON.stringify({tasks, courses}, null, 2);
+      if (isAndroid) {
+        Android.shareText(data);
+      } else {
+        const blob = new Blob([data], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'deadlines-backup.json';
+        a.click();
+      }
+    }
+
+    // ── Edit modal ────────────────────────────────────────────────────────────
+    let editingId = null;
+
+    function openEditModal(id) {
+      const t = tasks.find(t => t.id === id);
+      editingId = id;
+      document.getElementById('edit-name').value = t.name;
+      const sel = document.getElementById('edit-course');
+      sel.innerHTML = courses.length > 0
+        ? courses.map(c => `<option value="${c}"${c === t.course ? ' selected' : ''}>${c}</option>`).join('')
+        : `<option value="${t.course}">${t.course}</option>`;
+      document.getElementById('edit-due').value = t.due ? t.due.substring(0, 16) : '';
+      const examFields = document.getElementById('edit-exam-fields');
+      if (t.type === 'exam') {
+        examFields.style.display = '';
+        document.getElementById('edit-room').value = t.room || '';
+        document.getElementById('edit-end').value  = t.end  || '';
+      } else {
+        examFields.style.display = 'none';
+      }
+      document.getElementById('edit-modal').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.remove('open');
+      editingId = null;
+    }
+
+    function saveEdit() {
+      if (editingId === null) return;
+      const name   = document.getElementById('edit-name').value.trim();
+      const course = document.getElementById('edit-course').value;
+      if (!name || !course) { alert('Name and course are required.'); return; }
+      tasks = tasks.map(t => {
+        if (t.id !== editingId) return t;
+        const updated = {...t, name, course, due: document.getElementById('edit-due').value || null};
+        if (t.type === 'exam') {
+          updated.room = document.getElementById('edit-room').value.trim();
+          updated.end  = document.getElementById('edit-end').value.trim();
+        }
+        return updated;
+      });
+      const updated = tasks.find(t => t.id === editingId);
+      if (isAndroid) {
+        Android.updateTask(JSON.stringify(serializeTask(updated)));
+        if (updated.due && !updated.done)
+          Android.scheduleTaskReminder(updated.id, new Date(updated.due).getTime());
+        else
+          Android.cancelTaskReminder(updated.id);
+      }
+      closeEditModal();
+      render();
+    }
+
+    document.getElementById('edit-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeEditModal();
+    });
+
     // ── Tasks ─────────────────────────────────────────────────────────────────
-    // Called by Android after page load with saved tasks
     function loadTasksFromAndroid(savedTasks) {
       if (savedTasks && savedTasks.length > 0) {
-        tasks = savedTasks.map(t => ({
-          ...t,
-          due: t.due ? t.due : null
-        }));
+        tasks = savedTasks.map(t => ({...t, due: t.due || null}));
         nextId = Math.max(...tasks.map(t => t.id)) + 1;
-        // Seed courses from saved tasks if none stored yet
         if (courses.length === 0) {
           courses = [...new Set(tasks.map(t => t.course))].sort();
           saveCourses();
@@ -219,10 +369,8 @@
       render();
     }
 
-    // If not on Android (browser preview), load defaults
     if (!isAndroid) {
-      tasks = DEFAULT_TASKS;
-      nextId = 9;
+      tasks = DEFAULT_TASKS; nextId = 9;
       if (courses.length === 0) {
         courses = [...new Set(DEFAULT_TASKS.map(t => t.course))].sort();
         saveCourses();
@@ -237,25 +385,7 @@
       return out;
     }
 
-    const SUN  = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
-    const MOON = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-
-    function toggleTheme() {
-      const html = document.documentElement;
-      const dark = html.getAttribute('data-theme') === 'dark';
-      html.setAttribute('data-theme', dark ? 'light' : 'dark');
-      document.getElementById('theme-icon').innerHTML = dark ? SUN : MOON;
-      refreshTabStyles();
-    }
-
-    function refreshTabStyles() {
-      document.querySelectorAll('.tab-btn:not(.active)').forEach(b => {
-        b.style.background = 'var(--tab-inactive-bg)';
-        b.style.color = 'var(--tab-inactive-color)';
-        b.style.borderColor = 'var(--tab-inactive-border)';
-      });
-    }
-
+    // ── Utilities ─────────────────────────────────────────────────────────────
     function daysLeft(due) {
       if (!due) return null;
       const d = new Date(due); d.setHours(0,0,0,0);
@@ -263,13 +393,13 @@
     }
 
     function badgeFor(d, done) {
-      if (done)      return {cls:"badge-done",   label:"Done"};
-      if (d===null)  return {cls:"badge-tbd",    label:"TBD"};
-      if (d < 0)     return {cls:"badge-urgent", label:"Overdue"};
-      if (d === 0)   return {cls:"badge-urgent", label:"Due today"};
-      if (d <= 3)    return {cls:"badge-urgent", label:`${d}d left`};
-      if (d <= 7)    return {cls:"badge-warn",   label:`${d}d left`};
-      return              {cls:"badge-ok",    label:`${d}d left`};
+      if (done)     return {cls:"badge-done",   label:"Done"};
+      if (d===null) return {cls:"badge-tbd",    label:"TBD"};
+      if (d < 0)    return {cls:"badge-urgent", label:"Overdue"};
+      if (d === 0)  return {cls:"badge-urgent", label:"Due today"};
+      if (d <= 3)   return {cls:"badge-urgent", label:`${d}d left`};
+      if (d <= 7)   return {cls:"badge-warn",   label:`${d}d left`};
+      return             {cls:"badge-ok",    label:`${d}d left`};
     }
 
     function formatDue(due) {
@@ -282,13 +412,20 @@
     function toggleDone(id) {
       tasks = tasks.map(t => t.id === id ? {...t, done: !t.done} : t);
       const t = tasks.find(t => t.id === id);
-      if (isAndroid) Android.updateTask(JSON.stringify(serializeTask(t)));
+      if (isAndroid) {
+        Android.updateTask(JSON.stringify(serializeTask(t)));
+        if (t.done) Android.cancelTaskReminder(t.id);
+        else if (t.due) Android.scheduleTaskReminder(t.id, new Date(t.due).getTime());
+      }
       render();
     }
 
     function deleteTask(id) {
       tasks = tasks.filter(t => t.id !== id);
-      if (isAndroid) Android.deleteTask(id);
+      if (isAndroid) {
+        Android.deleteTask(id);
+        Android.cancelTaskReminder(id);
+      }
       render();
     }
 
@@ -306,60 +443,107 @@
       });
     }
 
-    function renderTaskList(container, items) {
-      const sorted = [...items].sort((a,b) => {
-        if (!a.due && !b.due) return 0;
-        if (!a.due) return 1; if (!b.due) return -1;
-        return new Date(a.due) - new Date(b.due);
-      });
+    function taskRowHtml(t) {
+      const d = daysLeft(t.due), b = badgeFor(d, t.done);
+      const isOverdue = !t.done && d !== null && d < 0;
+      const timeStr = t.room && t.due
+        ? ` · ${new Date(t.due).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}–${t.end} · Room ${t.room}`
+        : '';
+      return `<div class="task-row${t.done?' done':''}${t.type==='exam'?' exam-row':''}${isOverdue?' overdue-row':''}">
+        <div class="check-circle${t.done?' checked':''}" onclick="toggleDone(${t.id})"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:500;color:var(--text-primary);${t.done?'text-decoration:line-through;opacity:.5':''}">${t.name}</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${t.course}${timeStr} · ${formatDue(t.due)}</div>
+        </div>
+        <span class="badge ${b.cls}">${b.label}</span>
+        <button onclick="openEditModal(${t.id})" class="icon-btn" style="color:var(--text-muted)" title="Edit"
+          onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button onclick="deleteTask(${t.id})" class="icon-btn" style="color:var(--delete-btn-color)" title="Delete"
+          onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
+    }
 
-      let html = sorted.map(t => {
-        const d = daysLeft(t.due), b = badgeFor(d, t.done);
-        const timeStr = t.room && t.due
-          ? ` · ${new Date(t.due).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}–${t.end} · Room ${t.room}`
-          : '';
-        return `<div class="task-row${t.done?' done':''}${t.type==='exam'?' exam-row':''}">
-          <div class="check-circle${t.done?' checked':''}" onclick="toggleDone(${t.id})"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:500;color:var(--text-primary);${t.done?'text-decoration:line-through;opacity:.5':''}">${t.name}</div>
-            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${t.course}${timeStr} · ${formatDue(t.due)}</div>
-          </div>
-          <span class="badge ${b.cls}">${b.label}</span>
-          <button onclick="deleteTask(${t.id})" style="width:24px;height:24px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:var(--delete-btn-color);font-size:18px;display:flex;align-items:center;justify-content:center;padding:0"
-            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">×</button>
-        </div>`;
-      }).join('');
-
-      const isExam = items.some(t => t.type === 'exam');
+    function renderTaskList(container, items, isExam) {
       const cid = isExam ? 'exams' : 'assignments';
-      html += `<div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--section-divider)">
-        <div class="section-label">Add ${isExam?'exam':'assignment'}</div>
+
+      const overdue = items.filter(t => !t.done && t.due && daysLeft(t.due) < 0)
+                          .sort((a,b) => new Date(a.due) - new Date(b.due));
+      const active  = items.filter(t => !t.done && (!t.due || daysLeft(t.due) >= 0))
+                          .sort((a,b) => {
+                            if (!a.due && !b.due) return 0;
+                            if (!a.due) return 1; if (!b.due) return -1;
+                            return new Date(a.due) - new Date(b.due);
+                          });
+      const done    = items.filter(t => t.done);
+
+      let html = '';
+
+      if (overdue.length > 0) {
+        html += `<div class="group-label" style="color:#ef4444">Overdue</div>`;
+        html += overdue.map(taskRowHtml).join('');
+      }
+      if (active.length > 0) {
+        if (overdue.length > 0) html += `<div class="group-label" style="color:var(--text-muted);margin-top:16px">Upcoming</div>`;
+        html += active.map(taskRowHtml).join('');
+      }
+      if (done.length > 0) {
+        html += `<div class="group-label" style="color:var(--text-muted);margin-top:${overdue.length||active.length?'16px':'0'}">Completed</div>`;
+        html += done.map(taskRowHtml).join('');
+      }
+
+      const examExtra = isExam ? `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Room</div><input type="text" id="add-room-exams" placeholder="e.g. F305"></div>
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">End time</div><input type="text" id="add-end-exams" placeholder="e.g. 11:30"></div>
+        </div>` : '';
+
+      const addForm = `<div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--section-divider)">
+        <div class="section-label">Add ${isExam ? 'exam' : 'assignment'}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Name</div><input type="text" id="add-name-${cid}" placeholder="Name"></div>
           <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course</div>${courseSelectHtml(cid)}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
-          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Due date & time</div><input type="datetime-local" id="add-date-${cid}"></div>
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Due date &amp; time</div><input type="datetime-local" id="add-date-${cid}"></div>
           <button class="add-btn" onclick="addTask('${cid}',${isExam})">+ Add</button>
         </div>
+        ${examExtra}
       </div>`;
 
-      container.innerHTML = sorted.length === 0
-        ? `<div style="color:var(--text-muted);font-size:13px;padding:10px 0">Nothing here yet.</div>` + html.slice(html.indexOf('<div style="margin-top'))
-        : html;
+      if (overdue.length === 0 && active.length === 0 && done.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-muted);font-size:13px;padding:10px 0">Nothing here yet.</div>` + addForm;
+      } else {
+        container.innerHTML = html + addForm;
+      }
     }
 
     function addTask(cid, isExam) {
-      const name   = document.getElementById('add-name-'+cid).value.trim();
-      const course = document.getElementById('add-course-'+cid).value.trim();
+      const name    = document.getElementById('add-name-'+cid).value.trim();
+      const course  = document.getElementById('add-course-'+cid).value.trim();
       const dateVal = document.getElementById('add-date-'+cid).value;
       if (!name || !course) { alert('Please fill in name and course.'); return; }
       const newTask = {id: nextId++, name, course, due: dateVal || null, type: isExam ? 'exam' : 'assignment', done: false};
+      if (isExam) {
+        const room = document.getElementById('add-room-exams').value.trim();
+        const end  = document.getElementById('add-end-exams').value.trim();
+        if (room) newTask.room = room;
+        if (end)  newTask.end  = end;
+      }
       tasks.push(newTask);
-      if (isAndroid) Android.saveTask(JSON.stringify(serializeTask(newTask)));
+      if (isAndroid) {
+        Android.saveTask(JSON.stringify(serializeTask(newTask)));
+        if (newTask.due) Android.scheduleTaskReminder(newTask.id, new Date(newTask.due).getTime());
+      }
       document.getElementById('add-name-'+cid).value = '';
-      document.getElementById('add-course-'+cid).value = '';
       document.getElementById('add-date-'+cid).value = '';
+      if (isExam) {
+        document.getElementById('add-room-exams').value = '';
+        document.getElementById('add-end-exams').value  = '';
+      }
       render();
     }
 
@@ -380,13 +564,13 @@
     }
 
     function render() {
-      renderTaskList(document.getElementById('tab-assignments'), tasks.filter(t => t.type==='assignment'));
-      renderTaskList(document.getElementById('tab-exams'),       tasks.filter(t => t.type==='exam'));
+      renderTaskList(document.getElementById('tab-assignments'), tasks.filter(t => t.type==='assignment'), false);
+      renderTaskList(document.getElementById('tab-exams'),       tasks.filter(t => t.type==='exam'),       true);
       renderCourses();
       document.getElementById('stat-remaining').textContent = tasks.filter(t=>!t.done).length;
       document.getElementById('stat-done').textContent      = tasks.filter(t=>t.done).length;
       document.getElementById('stat-week').textContent      = tasks.filter(t=>!t.done&&t.due&&daysLeft(t.due)>=0&&daysLeft(t.due)<=7).length;
-      document.getElementById('today-label').textContent = 'Today is ' +
+      document.getElementById('today-label').textContent    = 'Today is ' +
         TODAY.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
       const sched = buildSchedule();
