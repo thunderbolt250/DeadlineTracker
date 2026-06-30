@@ -97,11 +97,13 @@
         <button class="tab-btn active" id="tab-btn-assignments" onclick="switchTab('assignments',this)" style="border:1px solid #3b65e8;background:#3b65e8;color:white">Assignments</button>
         <button class="tab-btn" id="tab-btn-exams" onclick="switchTab('exams',this)" style="border:1px solid var(--tab-inactive-border);background:var(--tab-inactive-bg);color:var(--tab-inactive-color)">Exams</button>
         <button class="tab-btn" id="tab-btn-schedule" onclick="switchTab('schedule',this)" style="border:1px solid var(--tab-inactive-border);background:var(--tab-inactive-bg);color:var(--tab-inactive-color)">Schedule</button>
+        <button class="tab-btn" id="tab-btn-courses" onclick="switchTab('courses',this)" style="border:1px solid var(--tab-inactive-border);background:var(--tab-inactive-bg);color:var(--tab-inactive-color)">Courses</button>
     </div>
 
     <div id="tab-assignments"></div>
     <div id="tab-exams" style="display:none"></div>
     <div id="tab-schedule" style="display:none"></div>
+    <div id="tab-courses" style="display:none"></div>
 </div>
 
 <script>
@@ -123,6 +125,75 @@
     let tasks = [];
     let nextId = 100;
 
+    // ── Courses ──────────────────────────────────────────────────────────────
+    const COURSES_KEY = 'deadline_tracker_courses';
+
+    function loadCourses() {
+      try {
+        const raw = localStorage.getItem(COURSES_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch(e) { return null; }
+    }
+
+    function saveCourses() {
+      try { localStorage.setItem(COURSES_KEY, JSON.stringify(courses)); } catch(e) {}
+    }
+
+    let courses = loadCourses() || [];
+
+    function addCourse() {
+      const input = document.getElementById('new-course-input');
+      const name = input.value.trim().toUpperCase();
+      if (!name) return;
+      if (courses.includes(name)) { input.value = ''; return; }
+      courses.push(name);
+      courses.sort();
+      saveCourses();
+      input.value = '';
+      renderCourses();
+      render(); // refresh dropdowns in other tabs
+    }
+
+    function deleteCourse(name) {
+      courses = courses.filter(c => c !== name);
+      saveCourses();
+      renderCourses();
+      render();
+    }
+
+    function renderCourses() {
+      const el = document.getElementById('tab-courses');
+      const rows = courses.map(c => `
+        <div class="task-row" style="padding:10px 14px">
+          <div style="flex:1;font-size:14px;font-weight:500;color:var(--text-primary)">${c}</div>
+          <button onclick="deleteCourse('${c}')" style="width:24px;height:24px;border-radius:6px;border:none;background:transparent;cursor:pointer;color:var(--delete-btn-color);font-size:18px;display:flex;align-items:center;justify-content:center;padding:0"
+            onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--delete-btn-color)'">×</button>
+        </div>`).join('');
+
+      el.innerHTML = `
+        ${courses.length === 0
+          ? `<div style="color:var(--text-muted);font-size:13px;padding:10px 0">No courses yet — add one below.</div>`
+          : rows}
+        <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--section-divider)">
+          <div class="section-label">Add course</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+            <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course code</div>
+              <input type="text" id="new-course-input" placeholder="e.g. IDS" style="text-transform:uppercase"
+                onkeydown="if(event.key==='Enter') addCourse()">
+            </div>
+            <button class="add-btn" onclick="addCourse()">+ Add</button>
+          </div>
+        </div>`;
+    }
+
+    function courseSelectHtml(cid) {
+      if (courses.length === 0)
+        return `<input type="text" id="add-course-${cid}" placeholder="Add courses first">`;
+      const opts = courses.map(c => `<option value="${c}">${c}</option>`).join('');
+      return `<select id="add-course-${cid}" style="width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s">${opts}</select>`;
+    }
+
+    // ── Tasks ─────────────────────────────────────────────────────────────────
     // Called by Android after page load with saved tasks
     function loadTasksFromAndroid(savedTasks) {
       if (savedTasks && savedTasks.length > 0) {
@@ -131,17 +202,33 @@
           due: t.due ? t.due : null
         }));
         nextId = Math.max(...tasks.map(t => t.id)) + 1;
+        // Seed courses from saved tasks if none stored yet
+        if (courses.length === 0) {
+          courses = [...new Set(tasks.map(t => t.course))].sort();
+          saveCourses();
+        }
       } else {
-        // First launch — seed defaults and save them
         tasks = DEFAULT_TASKS;
         nextId = 9;
         if (isAndroid) tasks.forEach(t => Android.saveTask(JSON.stringify(serializeTask(t))));
+        if (courses.length === 0) {
+          courses = [...new Set(DEFAULT_TASKS.map(t => t.course))].sort();
+          saveCourses();
+        }
       }
       render();
     }
 
     // If not on Android (browser preview), load defaults
-    if (!isAndroid) { tasks = DEFAULT_TASKS; nextId = 9; render(); }
+    if (!isAndroid) {
+      tasks = DEFAULT_TASKS;
+      nextId = 9;
+      if (courses.length === 0) {
+        courses = [...new Set(DEFAULT_TASKS.map(t => t.course))].sort();
+        saveCourses();
+      }
+      render();
+    }
 
     function serializeTask(t) {
       const out = {id:t.id, name:t.name, course:t.course, due:t.due||null, type:t.type, done:!!t.done};
@@ -214,7 +301,7 @@
       });
       btn.classList.add('active');
       btn.style.background = '#3b65e8'; btn.style.color = 'white'; btn.style.borderColor = '#3b65e8';
-      ['assignments','exams','schedule'].forEach(t => {
+      ['assignments','exams','schedule','courses'].forEach(t => {
         document.getElementById('tab-'+t).style.display = t === name ? 'block' : 'none';
       });
     }
@@ -249,7 +336,7 @@
         <div class="section-label">Add ${isExam?'exam':'assignment'}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Name</div><input type="text" id="add-name-${cid}" placeholder="Name"></div>
-          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course</div><input type="text" id="add-course-${cid}" placeholder="e.g. IDS"></div>
+          <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Course</div>${courseSelectHtml(cid)}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
           <div><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Due date & time</div><input type="datetime-local" id="add-date-${cid}"></div>
@@ -295,6 +382,7 @@
     function render() {
       renderTaskList(document.getElementById('tab-assignments'), tasks.filter(t => t.type==='assignment'));
       renderTaskList(document.getElementById('tab-exams'),       tasks.filter(t => t.type==='exam'));
+      renderCourses();
       document.getElementById('stat-remaining').textContent = tasks.filter(t=>!t.done).length;
       document.getElementById('stat-done').textContent      = tasks.filter(t=>t.done).length;
       document.getElementById('stat-week').textContent      = tasks.filter(t=>!t.done&&t.due&&daysLeft(t.due)>=0&&daysLeft(t.due)<=7).length;
