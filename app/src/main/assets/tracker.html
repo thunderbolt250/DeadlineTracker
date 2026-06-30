@@ -200,7 +200,6 @@
     }
 
     function deleteTask(id) {
-      if (!confirm('Remove this task?')) return;
       tasks = tasks.filter(t => t.id !== id);
       if (isAndroid) Android.deleteTask(id);
       render();
