@@ -157,19 +157,8 @@
     const TODAY = new Date(); TODAY.setHours(0,0,0,0);
     const isAndroid = typeof Android !== 'undefined';
 
-    const DEFAULT_TASKS = [
-      {id:1,name:"HW 5",course:"INFOSEC",due:"2026-04-15T23:59",type:"assignment",done:false},
-      {id:2,name:"Final proposal",course:"INFOSEC",due:"2026-04-22T05:59",type:"assignment",done:false},
-      {id:3,name:"Lab 3",course:"AIOPS",due:"2026-04-23T23:51",type:"assignment",done:false},
-      {id:4,name:"HW 4",course:"ICT BIZ",due:"2026-04-17T23:59",type:"assignment",done:false},
-      {id:5,name:"Assignment",course:"ICT BIZ",due:null,type:"assignment",done:false},
-      {id:6,name:"Final proposal",course:"IDS",due:"2026-05-11T16:00",type:"assignment",done:false},
-      {id:7,name:"ICT BIZ exam",course:"ICT BIZ",due:"2026-04-27T10:00",type:"exam",room:"F305",end:"11:30",done:false},
-      {id:8,name:"INFOSEC exam",course:"INFOSEC",due:"2026-04-28T10:00",type:"exam",room:"F203",end:"11:30",done:false},
-    ];
-
     let tasks = [];
-    let nextId = 100;
+    let nextId = 1;
 
     // ── Theme ─────────────────────────────────────────────────────────────────
     const SUN  = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
@@ -353,30 +342,11 @@
       if (savedTasks && savedTasks.length > 0) {
         tasks = savedTasks.map(t => ({...t, due: t.due || null}));
         nextId = Math.max(...tasks.map(t => t.id)) + 1;
-        if (courses.length === 0) {
-          courses = [...new Set(tasks.map(t => t.course))].sort();
-          saveCourses();
-        }
-      } else {
-        tasks = DEFAULT_TASKS;
-        nextId = 9;
-        if (isAndroid) tasks.forEach(t => Android.saveTask(JSON.stringify(serializeTask(t))));
-        if (courses.length === 0) {
-          courses = [...new Set(DEFAULT_TASKS.map(t => t.course))].sort();
-          saveCourses();
-        }
       }
       render();
     }
 
-    if (!isAndroid) {
-      tasks = DEFAULT_TASKS; nextId = 9;
-      if (courses.length === 0) {
-        courses = [...new Set(DEFAULT_TASKS.map(t => t.course))].sort();
-        saveCourses();
-      }
-      render();
-    }
+    if (!isAndroid) { render(); }
 
     function serializeTask(t) {
       const out = {id:t.id, name:t.name, course:t.course, due:t.due||null, type:t.type, done:!!t.done};
