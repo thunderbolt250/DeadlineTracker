@@ -55,6 +55,10 @@
         .day-item+.day-item{margin-top:4px}
         .section-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px}
         .group-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;padding:0 2px}
+        .group-toggle{display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:none;font-family:'DM Sans',sans-serif;cursor:pointer;text-align:left;padding-top:4px;padding-bottom:4px}
+        .group-toggle .chevron{transition:transform .2s}
+        .group-toggle.collapsed .chevron{transform:rotate(-90deg)}
+        .group-count{font-weight:500;letter-spacing:0;text-transform:none}
         input[type="text"],input[type="datetime-local"],input[type="time"]{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s}
         input:focus{border-color:#6690f5;box-shadow:0 0 0 3px rgba(102,144,245,.15)}
         select{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .15s,background .3s;color-scheme:light}
@@ -437,6 +441,30 @@
       </div>`;
     }
 
+    const COLLAPSE_KEY = 'deadline_tracker_completed_collapsed';
+
+    function loadCollapseState() {
+      try { const r = localStorage.getItem(COLLAPSE_KEY); return r ? JSON.parse(r) : {}; } catch(e) { return {}; }
+    }
+
+    let completedCollapsed = loadCollapseState();
+
+    // Default to folded: the completed list is the one that grows without bound.
+    function isCompletedCollapsed(cid) {
+      return completedCollapsed[cid] !== false;
+    }
+
+    // Toggles the DOM directly instead of re-rendering so half-typed input in the add form survives.
+    function toggleCompleted(cid) {
+      const collapsed = !isCompletedCollapsed(cid);
+      completedCollapsed[cid] = collapsed;
+      try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(completedCollapsed)); } catch(e) {}
+      const btn = document.getElementById('done-toggle-' + cid);
+      const list = document.getElementById('done-list-' + cid);
+      if (btn) { btn.classList.toggle('collapsed', collapsed); btn.setAttribute('aria-expanded', String(!collapsed)); }
+      if (list) list.style.display = collapsed ? 'none' : 'block';
+    }
+
     function renderTaskList(container, items, isExam) {
       const cid = isExam ? 'exams' : 'assignments';
 
@@ -461,8 +489,13 @@
         html += active.map(taskRowHtml).join('');
       }
       if (done.length > 0) {
-        html += `<div class="group-label" style="color:var(--text-muted);margin-top:${overdue.length||active.length?'16px':'0'}">Completed</div>`;
-        html += done.map(taskRowHtml).join('');
+        const collapsed = isCompletedCollapsed(cid);
+        html += `<button type="button" id="done-toggle-${cid}" class="group-label group-toggle${collapsed?' collapsed':''}" onclick="toggleCompleted('${cid}')"
+          aria-expanded="${!collapsed}" style="color:var(--text-muted);margin-top:${overdue.length||active.length?'16px':'0'}">
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          Completed <span class="group-count">(${done.length})</span>
+        </button>`;
+        html += `<div id="done-list-${cid}" style="display:${collapsed?'none':'block'}">${done.map(taskRowHtml).join('')}</div>`;
       }
 
       const examExtra = isExam ? `
